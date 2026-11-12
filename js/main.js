@@ -31,6 +31,8 @@
 
   function onDown(e) {
     e.preventDefault();
+    // retomar audio em todo gesto (garante som no iOS mesmo depois de suspender)
+    window.DH.Audio.ensureResume();
     unlockAudio();
     var p = toWorld(e.clientX, e.clientY);
     game.pointerMove(p.x, p.y);
@@ -185,10 +187,22 @@
   /* --------------------- audio unlock + wake lock ------------------ */
   var audioUnlocked = false;
   function unlockAudio() {
+    // sempre tenta retomar (barato e silencia caso volte a suspender)
+    window.DH.Audio.ensureResume();
     if (audioUnlocked) return;
     window.DH.Audio.unlock();
     audioUnlocked = true;
+    showToast('SOM LIGADO');
   }
+
+  // desbloqueia no PRIMEIRO gesto da pagina toda (fase de captura), para
+  // funcionar mesmo se o primeiro toque cair fora do canvas
+  function firstGesture() {
+    unlockAudio();
+  }
+  ['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(function (t) {
+    window.addEventListener(t, firstGesture, { capture: true, passive: true });
+  });
 
   var wakeLock = null;
   function requestWakeLock() {
@@ -222,6 +236,22 @@
   function loop(time) {
     game.tick(time);
     requestAnimationFrame(loop);
+  }
+
+  /* --------------------------- PWA: service worker ---------------- */
+  if ('serviceWorker' in navigator &&
+      (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1200);
   }
 
   updateSoundUI();

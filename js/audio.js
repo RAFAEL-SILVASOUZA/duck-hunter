@@ -18,16 +18,45 @@ window.DH = window.DH || {};
     if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.35;
-    master.connect(ctx.destination);
+    master.gain.value = 0.9;
+    // compressor para dar punch e nao distorcer quando muitos sons se somam
+    var comp = ctx.createDynamicsCompressor();
+    try {
+      comp.threshold.value = -18;
+      comp.knee.value = 24;
+      comp.ratio.value = 8;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.25;
+    } catch (e) {}
+    master.connect(comp);
+    comp.connect(ctx.destination);
     return ctx;
   }
 
-  function unlock() {
+  /* Desbloqueio robusto: precisa ser chamado DENTRO do gesto do usuario.
+     No iOS/Safari e preciso tocar um buffer mudo para "acordar" o contexto;
+     em outros basta resume(). Sempre toca um blip de confirmacao audivel. */
+  function unlock(withBlip) {
     var c = ensure();
     if (!c) return;
-    if (c.state === 'suspended' && c.resume) c.resume();
+    if (c.state === 'suspended' && c.resume) {
+      try { c.resume(); } catch (e) {}
+    }
+    // iOS: buffer de 1 amostra mudo dentro do gesture
+    try {
+      var buf = c.createBuffer(1, 1, c.sampleRate);
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      src.connect(master || c.destination);
+      if (src.noteOn) src.noteOn(0); else src.start(0);
+    } catch (e) {}
+    var fresh = !unlocked;
     unlocked = true;
+    if (enabled && (fresh || withBlip)) {
+      // bip de confirmacao: o usuario percebe que o som ligou
+      tone(880, 0.06, 'square', 0.3);
+      tone(1320, 0.07, 'square', 0.24, now() + 0.07);
+    }
   }
 
   function now() { return ctx ? ctx.currentTime : 0; }
@@ -89,8 +118,14 @@ window.DH = window.DH || {};
   }
 
   var A = {
-    unlock: unlock,
-    setEnabled: function (v) { enabled = v; if (v) unlock(); },
+    unlock: function () { unlock(true); },
+    /* tenta retomar um contexto suspenso sem emitir som (chamado em todo gesto) */
+    ensureResume: function () {
+      if (!ctx) { return; }
+      if (ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch (e) {} }
+    },
+    state: function () { return ctx ? ctx.state : 'none'; },
+    setEnabled: function (v) { enabled = v; if (v) unlock(true); },
     isEnabled: function () { return enabled; },
     isUnlocked: function () { return unlocked; },
 
