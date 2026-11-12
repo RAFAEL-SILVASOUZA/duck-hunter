@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a2b3c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Duck Hunt recriado em HTML5 Canvas, responsivo para desktop e celular.">
+<title>Duck Hunt JS</title>
+<style>
+  :root{
+    --bg:#152230; --panel:#0d1620; --accent:#ffd93b; --line:#2a4158;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #24384b 0%, #152230 60%, #0e161f 100%);
+    color:#e8f1f8;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    display:flex; flex-direction:column;
+    height:100dvh; width:100vw;
+    overflow:hidden; overscroll-behavior:none;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+    position:fixed; inset:0;
+  }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: calc(6px + var(--safe-t)) 12px 6px;
+    gap:10px; flex:0 0 auto;
+  }
+  header .title{
+    font-weight:800; letter-spacing:.08em; font-size:clamp(13px,2.4vw,18px);
+    color:#fff; display:flex; align-items:center; gap:8px;
+  }
+  header .title .duck{
+    display:inline-block; width:20px; height:14px; border-radius:50% 50% 50% 50%/60% 60% 40% 40%;
+    background:linear-gradient(180deg,#2f9c3a 0 55%, #151217 55%);
+    position:relative;
+  }
+  header .title .duck::before{
+    content:""; position:absolute; left:-4px; top:3px; width:6px; height:6px;
+    background:#f0b429; border-radius:2px;
+  }
+  .ctrls{ display:flex; gap:8px; }
+  .ctrls button{
+    width:42px; height:42px; border-radius:12px;
+    border:1px solid var(--line); background:rgba(255,255,255,.06);
+    color:#fff; font-size:20px; line-height:1; cursor:pointer;
+    display:grid; place-items:center; transition:transform .05s ease, background .2s;
+  }
+  .ctrls button:active{ transform:scale(.92); background:rgba(255,255,255,.14); }
+  .ctrls button.off{ opacity:.5; }
+
+  #stage{
+    flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+    padding:6px 10px calc(6px + var(--safe-b));
+    min-height:0; position:relative;
+  }
+  #wrap{
+    position:relative;
+    /* proporcao 4:3 mantida por aspect-ratio + clamp nas duas dimensoes */
+    width:min(96vw, calc((100dvh - 130px) * 4 / 3));
+    max-width:1120px;
+    aspect-ratio:4 / 3;
+    border-radius:10px; overflow:hidden;
+    background:#54a8fc;
+    box-shadow:0 18px 50px rgba(0,0,0,.55), 0 0 0 2px #0a1017, 0 0 0 6px #23394e;
+  }
+  canvas#game{
+    display:block; width:100%; height:100%;
+    image-rendering:pixelated; image-rendering:crisp-edges;
+    cursor:none;
+  }
+
+  /* botao de tiro (mobile) */
+  #fire-btn{
+    position:absolute; right:14px; bottom:14px;
+    width:96px; height:96px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.6);
+    background:radial-gradient(circle at 50% 35%, #ff5a5a 0 45%, #b81d1d 100%);
+    color:#fff; font-weight:800; font-size:15px; letter-spacing:.05em;
+    display:none; place-items:center; touch-action:none;
+    box-shadow:0 8px 20px rgba(0,0,0,.45), inset 0 -6px 12px rgba(0,0,0,.35);
+    z-index:5;
+  }
+  #fire-btn:active{ transform:scale(.94); }
+
+  footer{
+    flex:0 0 auto; text-align:center;
+    font-size:11px; color:#7f97ab; padding:0 10px calc(8px + var(--safe-b));
+    line-height:1.5;
+  }
+  footer b{ color:#b9ccdb; }
+  .kbd{ display:inline-block; padding:1px 6px; border:1px solid var(--line);
+        border-radius:5px; background:rgba(255,255,255,.05); margin:0 2px; font-size:10px; }
+
+  /* mostrar botao de tiro em toque */
+  body.touch #fire-btn{ display:grid; }
+  body.touch canvas#game{ cursor:crosshair; }
+
+  /* orientacao retrato: sugere girar, mas joga igual */
+  #rotate{
+    position:fixed; inset:0; z-index:20; display:none;
+    background:rgba(10,16,23,.94); color:#e8f1f8;
+    align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    text-align:center; padding:24px; font-size:15px;
+  }
+  #rotate .icon{ font-size:46px; animation: spin 1.6s ease-in-out infinite; }
+  @keyframes spin{ 0%,20%{transform:rotate(0)} 55%,100%{transform:rotate(90deg)} }
+  body.need-rotate #rotate{ display:flex; }
+  #rotate button{
+    margin-top:8px; padding:10px 18px; border-radius:10px; border:1px solid var(--line);
+    background:var(--accent); color:#222; font-weight:700; cursor:pointer;
+  }
+
+  /* tela cheia: da mais area ao jogo */
+  :fullscreen body,
+  :-webkit-full-screen body{ background:#0e161f; }
+  :fullscreen footer, :-webkit-full-screen footer{ display:none; }
+  :fullscreen header, :-webkit-full-screen header{ padding-top:8px; }
+  :fullscreen #stage, :-webkit-full-screen #stage{ padding:8px 10px; }
+  :fullscreen #wrap, :-webkit-full-screen #wrap{
+    width:min(99vw, calc((100dvh - 74px) * 4 / 3));
+  }
+
+  @media (max-width:560px){
+    footer{ font-size:10px; }
+    .ctrls button{ width:40px; height:40px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="title"><span class="duck"></span> DUCK HUNT <span style="opacity:.55;font-weight:600">JS</span></div>
+    <div class="ctrls">
+      <button id="btn-sound" title="Som" aria-label="Som">&#9834;</button>
+      <button id="btn-pause" title="Pausar" aria-label="Pausar">&#9208;</button>
+      <button id="btn-full" title="Tela cheia" aria-label="Tela cheia">&#9974;</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <div id="wrap">
+      <canvas id="game" width="320" height="240"></canvas>
+      <div id="fire-btn">FIRE</div>
+    </div>
+  </main>
+
+  <footer>
+    <div id="hint-desktop">
+      <b>Mouse</b>: mirar e atirar &nbsp;|&nbsp; <span class="kbd">Espaco</span> atirar
+      &nbsp; <span class="kbd">P</span> pausar &nbsp; <span class="kbd">F</span> tela cheia &nbsp; <span class="kbd">M</span> som
+    </div>
+    <div id="hint-touch" style="display:none">
+      <b>Toque na tela</b> para mirar e atirar. Use <b>FIRE</b> para disparar mais rapido. Vire o celular na <b>horizontal</b>.
+    </div>
+  </footer>
+
+  <div id="rotate">
+    <div class="icon">&#8635;</div>
+    <div>Vire o celular na <b>horizontal</b><br>para uma melhor experiencia.</div>
+    <button id="rotate-ok">Jogar assim mesmo</button>
+  </div>
+
+  <script src="js/util.js"></script>
+  <script src="js/pixel.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

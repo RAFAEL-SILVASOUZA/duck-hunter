@@ -1,0 +1,7 @@
+# Estado interno da plataforma de agente (banco de dados, checkpoints, preferências)
+.agent-platform/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+*.log
