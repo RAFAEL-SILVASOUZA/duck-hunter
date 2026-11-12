@@ -1,4 +1,4 @@
-# Duck Hunt JS
+# Duck Hunt JS V0
 
 Uma recriacao do classico **Duck Hunt** (NES) feita em **HTML5 Canvas + JavaScript puro**, sem dependencias externas. Todo o conteudo do jogo (sprites, fonte, sons) e gerado por codigo em tempo de execucao: nao ha uma unica imagem ou arquivo de audio no projeto.
 
